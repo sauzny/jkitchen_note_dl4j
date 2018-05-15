@@ -9,6 +9,7 @@ import javax.swing.JFileChooser;
 
 import org.datavec.image.loader.NativeImageLoader;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.nd4j.jita.conf.CudaEnvironment;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.preprocessor.DataNormalization;
 import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
@@ -16,8 +17,9 @@ import org.spark_project.guava.collect.Lists;
 
 import lombok.extern.slf4j.Slf4j;
 
+// 识别一张自选照片
 @Slf4j
-public class MyMnist01 {
+public class RecognitionOne {
 
     public static String fileChose() {
         JFileChooser fc = new JFileChooser();
@@ -32,6 +34,9 @@ public class MyMnist01 {
       }
     
     public static void main(String[] args) throws IOException {
+        
+        CudaEnvironment.getInstance().getConfiguration().allowMultiGPU(true);
+        
         int height = 28;
         int width = 28;
         int channels = 1;
@@ -77,7 +82,8 @@ public class MyMnist01 {
         scaler.transform(image);
         
         // Pass through to neural Net
-        INDArray output = model.output(image.reshape(1, 784));
+        //INDArray output = model.output(image.reshape(1, 784));
+        INDArray output = model.output(image);
 
         log.info("The file chosen was " + filechose);
         log.info("The neural nets prediction (list of probabilities per label)");

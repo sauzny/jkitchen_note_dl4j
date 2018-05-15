@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+
+
+
+    <!--### direct log messages to console ###-->
+    <appender name="console" class="org.apache.log4j.ConsoleAppender">
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d] [%t] %-5p (%F\:%L) - %m%n"/>
+        </layout>
+    </appender>
+
+
+    <!--### set log levels - for more verbose logging change 'info' to 'debug'
+    ### 级别：all<debug<info<warn<error<fatal<off ###-->
+    <root>
+        <level value="INFO"/>
+        <appender-ref ref="console"/>
+    </root>
+
+</log4j:configuration>

@@ -10,11 +10,11 @@ public final class SerializableModelUtils {
     private SerializableModelUtils(){}
     
     public static void out(MultiLayerNetwork model){
-        out(model, "D://LungCNNModel.zip");
+        out(model, "E:\\data01\\dl4j\\models\\MnistModel.zip");
     }
     
     public static MultiLayerNetwork in(){
-        return in("D://LungCNNModel.zip");
+        return in("E:\\data01\\dl4j\\models\\MnistModel.zip");
     }
     
     public static void out(MultiLayerNetwork model, String modelPath) {

@@ -1,11 +1,14 @@
 package com.sauzny.mnist;
 
 import java.io.IOException;
+import java.util.Random;
 
 import org.deeplearning4j.datasets.iterator.impl.MnistDataSetIterator;
 import org.deeplearning4j.eval.Evaluation;
+import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
+import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
@@ -17,26 +20,19 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.learning.config.Nesterovs;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Hello world!
- *
- */
 @Slf4j
-public class App {
+public class TrainModel {
 
     public static void main(String[] args) throws IOException {
         
-        CudaEnvironment.getInstance().getConfiguration().allowMultiGPU(true);
+        long start = System.currentTimeMillis();
         
-        System.out.println(System.getProperty("java.io.tmpdir"));
-        //number of rows and columns in the input pictures
-        final int numRows = 28; // 矩阵的行数。
-        final int numColumns = 28; // 矩阵的列数。
-        int outputNum = 10; // 潜在结果（比如0到9的整数标签）的数量。
+        CudaEnvironment.getInstance().getConfiguration().allowMultiGPU(true);
         
         /**
          * batchSize 和 numEpochs必须根据经验选择，而经验则需要通过实验来积累。
@@ -46,58 +42,43 @@ public class App {
          * 总的来说，需要进行实验才能发现最优的数值。
          * 本示例中设定了合理的默认值。
          */
-        int batchSize = 128; // 每一步抓取的样例数量。
-        int numEpochs = 15; // 一个epoch指将给定数据集全部处理一遍的周期。
         
-        int rngSeed = 123; // 这个随机数生成器用一个随机种子来确保训练时使用的初始权重维持一致。下文将会说明这一点的重要性。
-        double rate = 0.0015; // learning rate
-
-        
+        int height = 28;
+        int width = 28;
+        int channels = 1;
+        int rngseed = 123;
+        Random randNumGen = new Random(rngseed);
+        int batchSize = 128;
+        int outputNum = 10;
+        int numEpochs = 15;
         
         //Get the DataSetIterators:
-        DataSetIterator mnistTrain = new MnistDataSetIterator(batchSize, true, rngSeed);
-        DataSetIterator mnistTest = new MnistDataSetIterator(batchSize, false, rngSeed);
+        DataSetIterator mnistTrain = TrainModelUtils.mnistTrain();
+        DataSetIterator mnistTest = TrainModelUtils.mnistTest();
 
         log.info("Build model....");
         
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
-                /**
-                 * 该参数将一组随机生成的权重确定为初始权重。
-                 * 如果一个示例运行很多次，而每次开始时都生成一组新的随机权重，那么神经网络的表现（准确率和F1值）有可能会出现很大的差异，
-                 * 因为不同的初始权重可能会将算法导向误差曲面上不同的局部极小值。
-                 * 在其他条件不变的情况下，保持相同的随机权重可以使调整其他超参数所产生的效果表现得更加清晰。
-                 */
-            .seed(rngSeed) //include a random seed for reproducibility
-            
-            /**
-             * 随机梯度下降（Stochastic Gradient Descent，SGD）是一种用于优化代价函数的常见方法。
-             * 要了解SGD和其他帮助实现误差最小化的优化算法，可参考Andrew Ng的机器学习课程以及本网站术语表中对SGD的定义。
-             */
-            //.optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-            .activation(Activation.RELU)
-            .weightInit(WeightInit.XAVIER)
-            .updater(new Nesterovs(rate, 0.98))
-            .l2(rate * 0.005) // regularize learning model
-            .list()
-            .layer(0, new DenseLayer.Builder() //create the first input layer.
-                    .nIn(numRows * numColumns)
-                    .nOut(500)
-                    .build())
-            .layer(1, new DenseLayer.Builder() //create the second input layer
-                    .nIn(500)
-                    .nOut(300)
-                    .build())
-            .layer(2, new DenseLayer.Builder() //create the 3 input layer
-                    .nIn(300)
+                .seed(rngseed)
+                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+                .updater(new Nesterovs(0.006, 0.9))
+                .l2(1e-4)
+                .list()
+                .layer(0, new DenseLayer.Builder()
+                    .nIn(height * width)
                     .nOut(100)
+                    .activation(Activation.RELU)
+                    .weightInit(WeightInit.XAVIER)
                     .build())
-            .layer(3, new OutputLayer.Builder(LossFunction.NEGATIVELOGLIKELIHOOD) //create hidden layer
-                    .activation(Activation.SOFTMAX)
+                .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                     .nIn(100)
                     .nOut(outputNum)
+                    .activation(Activation.SOFTMAX)
+                    .weightInit(WeightInit.XAVIER)
                     .build())
-            .pretrain(false).backprop(true) //use backpropagation to adjust weights
-            .build();
+                .pretrain(false).backprop(true)
+                .setInputType(InputType.convolutional(height, width, channels))
+                .build();
 
         MultiLayerNetwork model = new MultiLayerNetwork(conf);
         model.init();
@@ -108,7 +89,8 @@ public class App {
             log.info("Epoch " + i);
             model.fit(mnistTrain);
         }
-
+        
+        // 保存模型
         SerializableModelUtils.out(model);
         
         log.info("Evaluate model....");
@@ -121,6 +103,10 @@ public class App {
 
         log.info(eval.stats());
         log.info("****************Example finished********************");
+        
+        long end = System.currentTimeMillis();
+        
+        System.out.println(end - start);
     }
 }
 
